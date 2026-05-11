@@ -1,205 +1,47 @@
-"""
-Developed by K. Salehi-Ashtiani and ChatGPTo1
-
-***************DEPENDENCY INSTALLATION********************************************************************
-Make a new conda env with python 3.10, e.g., $conda create -n esm python=3.10, then $conda activate esm
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
-pip install pandas
-pip install fair-esm #Install the ESM Library
-pip install biopython
-pip install transformers
-conda install tqdm
-********************************************************************************************************
-
-
-The script defines a Siamese-style model architecture that uses a pre-trained ESM (Evolutionary Scale Modeling) transformer-based protein language model for predicting protein-protein interactions (PPIs). In more detail:
-
-Model Type:
-we reworked the Siamese PPI script into a new ppiBTPE framework that initializes the transformer from scratch and still supports freezing the first N layers for fine-tuning. Check out the updated siamese_ppi_btpe.py canvas alongside—I’ve renamed the model class to SiameseBTPE, switched to random weight initialization via the ESM config, and kept the same CLI flags (now using --model_config to point at the architecture).
-
-The architecture allows freezing lower layers of a pretrained model and training the top ones as specified by args; it should also allow starting with a pretrained ESM model and again, freezing lower layers and training the top one ()
-
-Approach:
-
-Pre-trained Foundation Model: The code employs a pre-trained ESM model architecture (to train from scratch, or from a pretrained ESM model) from the Hugging Face Transformers library. ESM models are large language models trained on protein sequences.
-Feature Extraction: Each input sequence is tokenized and fed into the ESM model to produce embedding representations. The [CLS] (or first token) embeddings from both sequences are extracted.
-Siamese Architecture: The outputs from the two branches (each branch is the same model, i.e., user or ESM model, applied to a different input sequence) are concatenated and passed through a linear classification layer to predict whether the two proteins interact.
-Fine-Tuning with Layer Freezing: The code partially freezes the lower layers of the model, allowing only the top layers and the classification head to be fine-tuned.
-Classification Task: The final output is a classification (e.g., binary classification of "friends" vs. not interacting), trained using a cross-entropy loss.
-In summary, the script implements a Siamese neural network for protein-protein interaction prediction, allowing training from scratch, or using a pre-trained transformer model with partial fine-tuning.
-
-
-
-
-python train_siamese_esm.py \
-    --train_file path/to/train.csv \
-    --val_file path/to/val.csv \
-    --output_dir ./trained_model \
-    --epochs 5 \
-    --batch_size 8 \
-    --learning_rate 2e-5 \
-    --max_length 512 \
-    --pretrained_model facebook/esm1b_t33_650M_UR50S \
-    --device cuda
-
-    Explanation of Command-Line Arguments
---train_file (Required): Path to the training CSV file containing the protein pairs and labels.
-
---val_file (Required): Path to the validation CSV file.
---output_dir: Directory where the trained model will be saved. Defaults to the current directory (./).
-
---epochs: Number of epochs to train the model. Default is 3.
-
---batch_size: Batch size for both training and validation. Default is 4.
-
---learning_rate: Learning rate for the optimizer. Default is 1e-5.
-
---max_length: Maximum sequence length for tokenization. Sequences longer than this will be truncated. Default is 1024.
-
---pretrained_model: Name or path of the pre-trained ESM model to use. Default is 'facebook/esm1b_t33_650M_UR50S'.
-
---num_labels: Number of output labels for classification. For binary classification, this should be 2. Default is 2.
-
---device: Device to run the training on. Options are 'cpu' or 'cuda'. Default is 'cuda' if available, otherwise 'cpu'.
-
-
-
-Summary of Args
-Positional Arguments: None. Some arguments are optional and some are required.
-
-Required Arguments:
-
---train_file: Training data file.
---val_file: Validation data file.
-
-Optional Arguments:
-
---output_dir: Where to save the trained model.
---epochs: Number of epochs to train.
---batch_size: Batch size.
---learning_rate: Learning rate.
---max_length: Maximum tokenization length.
---pretrained_model: Pre-trained model name or path.
---num_labels: Number of labels for classification.
---device: Compute device to use.
-
-
-Example Command:
-
-
-python train_siamese_esm.py \
-    --train_file path/to/train.csv \
-    --val_file path/to/val.csv \
-    --output_dir ./trained_model \
-    --epochs 5 \
-    --batch_size 4 \
-    --learning_rate 1e-5 \
-    --max_length 1024 \
-    --pretrained_model facebook/esm1b_t33_650M_UR50S \
-    --device cuda \
-    --freeze_layers 20
-
-
-Sample command to run the script:
-
-python siamese-ppi-esm4.py --train_file new_train_biogrid-humRND.csv --val_file val_friends-hum-RND.csv --output_dir out-tbt --epochs 5 --max_length 1024 --device cuda --freeze_layers 20
-
-python siamese-ppi-esm4.py --train_file train.csv --val_file val.csv --output_dir out-tbt --epochs 5 --max_length 1024 --device cuda --freeze_layers 26
-
-
-"""
 #!/usr/bin/env python3
-
 """
-Developed by K. Salehi-Ashtiani and ChatGPT
+train_ppiBTPE3b.py — Train or fine-tune the ppiBTEP / SiameseBTPE model for
+protein-protein interaction (PPI) classification.
 
-This script defines a Siamese-style BERT-Twin Protein Encoder model (ppiBTPE) for predicting protein-protein interactions (PPIs). The model is initialized from scratch (random weights) using a transformer architecture defined by an ESM model configuration, and includes optional layer freezing functionality for fine-tuning.
+Architecture
+------------
+SiameseBTPE: two branches with shared weights, each an ESM-1b encoder
+(facebook/esm1b_t33_650M_UR50S by default). Each branch produces a [CLS]
+embedding (last_hidden_state[:, 0, :], dim=1280). The two [CLS] embeddings
+are concatenated (dim=2560), passed through Dropout(0.1) and a Linear layer
+to 2 logits (CrossEntropyLoss; softmax applied at inference).
 
+Modes
+-----
+- From scratch:       --num_layers N --freeze_layers 0
+- Fine-tuning ESM-1b: omit --num_layers, set --freeze_layers >= 1
+- Resume:             --checkpoint <path/to/ppiBTPE_epoch_K.pth>
 
+Important
+---------
+When training from scratch, pass --freeze_layers 0 explicitly. The default is
+20, which would freeze most of the model.
 
-The updated ssi­amese_ppi_btpe.py still accepts:
+Data format
+-----------
+CSV with columns: seq1, seq2, label
+  - label = 1 or 'friends'  → interacting
+  - label = 0 or 'enemies'  → non-interacting
 
---train_file
-
---val_file
-
---model_config (formerly your pretrained‐ESM flag; now points at the ESM config for architecture)
-
---num_labels
-
---freeze_layers
---num_layers # e.g. when you start from scratch
---epochs
---batch_size
---learning_rate
---max_length
---output_dir
---device
-
-python siamese_ppi_btpe.py \
-  --train_file path/to/train.csv \
-  --val_file   path/to/val.csv
-
---model_config facebook/esm1b_t33_650M_UR50S
---num_labels 2
---freeze_layers 20 #--freeze_layers 0 when starting from scratch
---num_layers # specify when start from scratch 12
---epochs 3
---batch_size 4
---learning_rate 1e-5
---max_length 1024
---output_dir ./
---device cuda (falls back to CPU if no GPU)
-
-
-python train_ppiBTPE1.py --train_file train.csv --val_file val.csv --output_dir out-tbt --epochs 5 --max_length 1024 --device cuda --freeze_layers --num_layers 12
-
-
-"""
-#!/usr/bin/env python3
-
-"""
-Developed by K. Salehi-Ashtiani and ChatGPT
-
-This script defines a Siamese-style BERT-Twin Protein Encoder model (ppiBTPE) for predicting protein-protein interactions (PPIs). The model is initialized from scratch (random weights) using a transformer architecture defined by an ESM model configuration, with optional layer freezing and configurable depth for fine-tuning or scratch training.
-
-**************
-Requirements:
-Make a new conda env with python 3.10, e.g., $conda create -n esm python=3.10, then $conda activate esm
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
-pip install pandas
-pip install fair-esm #Install the ESM Library
-pip install biopython
-pip install transformers
-conda install tqdm
-**************Additional notes on this version
-
-When starting to train from scratch, do '--freeze_layers 0' instead of not including the argument, that way all layers (including embeddings) remain trainable. If you left the flag off, you’d end up freezing 20 layers by default.
-
-Data are padded to a max_length parameters; therefore, use the same or smaller --max_length when you fine-tune or infer.
-
-Important: When fine-tuning, make sure you specify where the checkpoint is, e.g.,:
---checkpoint out-tbt/ppiBTPE_epoch_12.pth \
-
-Example:
-$ python train_ppiBTPE3.py --train_file train01_s.csv --val_file val01_s.csv --output_dir out-tbt --checkpoint out-tbt/ppiBTPE_epoch_1.pth --epochs 2 --max_length 1024 --batch_size 1 --device cuda --freeze_layers 10 --num_layers 14
-
-
-
-"""
-#!/usr/bin/env python3
-
-"""
-Developed by K. Salehi-Ashtiani and ChatGPT
-
-This script defines a Siamese-style BERT-Twin Protein Encoder model (ppiBTPE) for predicting protein-protein interactions (PPIs).
-Supports:
- - training from scratch (--num_layers)
- - partial fine-tuning (--freeze_layers)
- - loading weights from a checkpoint (--checkpoint)
-
-
-
+Example
+-------
+    python train_ppiBTPE3b.py \\
+        --train_file train.csv \\
+        --val_file val.csv \\
+        --model_config facebook/esm1b_t33_650M_UR50S \\
+        --num_layers 12 \\
+        --freeze_layers 0 \\
+        --epochs 20 \\
+        --batch_size 2 \\
+        --learning_rate 1e-5 \\
+        --max_length 1024 \\
+        --output_dir ./out \\
+        --device cuda
 """
 import argparse
 import os

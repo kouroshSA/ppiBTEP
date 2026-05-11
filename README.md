@@ -18,7 +18,7 @@ The model was developed for the *Prochlorococcus marinus* MED4 interactome, wher
 |-----------|-------|
 | Foundation | ESM-1b (facebook/esm1b_t33_650M_UR50S) |
 | Strategy | Siamese / twin-branch |
-| Layers | 6-18 (configurable) |
+| Layers | 12 default; 6, 8, 12, 16, or 18 selectable via --num_layers |
 | Classification | Concat [CLS_A, CLS_B] -> Dropout(0.1) -> Linear -> 2 |
 | Max sequence length | 1,024 tokens |
 | Optimizer | AdamW (lr = 1 x 10^-5) |
@@ -153,6 +153,10 @@ The ASCII workflow diagram (`assets/ppiBTEP.png`) covers:
 - **B.** Model architecture (twin ESM-1b branches + concat classification head)
 - **C.** Training pipeline
 - **D.** Inference pipeline (multi-GPU)
+
+> Note: the diagram shows Softmax in the classification head for clarity, but
+> the implementation returns raw logits — softmax is applied implicitly by
+> CrossEntropyLoss during training and explicitly during inference.
 
 ## Citation
 

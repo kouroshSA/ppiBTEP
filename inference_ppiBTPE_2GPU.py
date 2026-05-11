@@ -1,83 +1,38 @@
-"""
-inference_ppiBTPE_2GPU.py
-
-***************DEPENDENCIES****************************************************************************
-Make a new conda env with python 3.10, e.g., $conda create -n esm python=3.10, then $conda activate esm
-pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu117
-pip install pandas
-pip install fair-esm #Install the ESM Library
-pip install biopython
-pip install transformers
-conda install tqdm
-********************************************************************************************************
-
-
-python inference_siamese_esm.py \
-    --model_path path/to/siamese_esm_model.pth \
-    --input_file path/to/test.csv \
-    --output_file path/to/predictions.csv \
-    --batch_size 4 \
-    --max_length 1024 \
-    --pretrained_model facebook/esm1b_t33_650M_UR50S \
-    --device cuda
-
-
-Arguments:
-
---model_path: Path to the fine-tuned model file (siamese_esm_model.pth).
-
---input_file: Path to the CSV file containing the protein pairs to classify.
-
---output_file: Path where the predictions will be saved.
-
---batch_size: Batch size for inference (adjust based on available memory).
-
---max_length: Maximum sequence length (should match the value used during training).
-
---pretrained_model: Should match the model used during training.
-
---device: 'cuda' or 'cpu'.
-
-Output File
-Predictions CSV File (--output_file):
-
-Contains the original sequences along with the predicted label and probabilities.
-
-Sequence1	Sequence2	Prediction	Probability_Friends	Probability_Enemies
-MKT...	GHP...	friends	0.85	0.15
-LKP...	TRS...	enemies	0.30	0.70
-...	...	...	...	...
-Example Usage:
-
-Single GPU: python inference.py --model_path model.pth --input_file input.csv --output_file output.csv --device cuda:0
-Multiple GPUs: python inference.py --model_path model.pth --input_file input.csv --output_file output.csv --device cuda:0,1
-CPU: python inference.py --model_path model.pth --input_file input.csv --output_file output.csv --device cpu
-example command:
-
-python inference_siamese_esm1_2GPU.py --model_path ./out/siamese_esm_model_epoch_1.pth --input_file PRS_filtered.csv --output_file out_ppi/PRS_filtered.csv --max_length 1024 --device cuda:0,1
-
-"""
 #!/usr/bin/env python3
-
 """
-Modified inference script for ppiBTPE SiameseBTPE model.
-Loads a from-scratch Siamese BERT-Twin Protein Encoder (ppiBTPE) trained model and performs PPI inference.
+inference_ppiBTPE_2GPU.py — Batch inference for ppiBTEP / SiameseBTPE,
+supporting single-GPU, multi-GPU (DataParallel), and CPU execution.
 
-python inference_siamese_esm1_2GPU.py \
-  --model_path ./out-tbt/ppiBTPE_epoch_1.pth \
-  --model_config facebook/esm1b_t33_650M_UR50S \
-  --num_layers 12 \
-  --input_file PRS_filtered.csv \
-  --output_file out_ppi/PRS_filtered.csv \
-  --batch_size 4 \
-  --max_length 1024 \
-  --device cuda:0
+Inputs
+------
+CSV with at least 2 columns: seq1, seq2 (label column, if present, is ignored).
 
+Outputs
+-------
+CSV with columns: seq1, seq2, Prediction, Probability_Friends, Probability_Enemies
 
+Example (single GPU)
+--------------------
+    python inference_ppiBTPE_2GPU.py \\
+        --model_path out/ppiBTPE_epoch_17.pth \\
+        --model_config facebook/esm1b_t33_650M_UR50S \\
+        --num_layers 12 \\
+        --input_file test_pairs.csv \\
+        --output_file predictions.csv \\
+        --batch_size 4 \\
+        --max_length 1024 \\
+        --device cuda
+
+Example (multi-GPU)
+-------------------
+    python inference_ppiBTPE_2GPU.py \\
+        --model_path out/ppiBTPE_final.pth \\
+        --model_config facebook/esm1b_t33_650M_UR50S \\
+        --num_layers 12 \\
+        --input_file test_pairs.csv \\
+        --output_file predictions.csv \\
+        --device cuda:0,1
 """
-#!/usr/bin/env python3
-
-
 import argparse
 import os
 import torch
