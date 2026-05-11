@@ -63,9 +63,7 @@ ppiBTEP/
 |-- inference_ppiBTPE_2GPU.py            # Batch inference script (multi-GPU)
 |-- roc_analysis_color_threshold_F1e.py  # ROC curve analysis with F1 optimization
 |-- assets/
-|   |-- ppiBTEP.png                      # Model architecture diagram
-|   |-- ppiBTEP_architecture.svg         # Detailed architecture flow (SVG)
-|   +-- ppiBTEP_architecture.png         # Detailed architecture flow (PNG)
+|   +-- ppiBTEP.png                      # ASCII workflow diagram
 |-- requirements.txt
 |-- LICENSE
 +-- README.md
@@ -150,11 +148,11 @@ The input CSV should have two columns: PRS (positive) and RRS (random/negative) 
 
 ## Architecture Diagram
 
-See `assets/ppiBTEP_architecture.svg` for a detailed flow diagram covering:
-- **A.** Model architecture (Siamese / twin-branch strategy)
-- **B.** ppiBTEP (Siamese) vs ppiDCE (cross-encoder) comparison
+The ASCII workflow diagram (`assets/ppiBTEP.png`) covers:
+- **A.** Siamese input strategy (independent per-protein encoding)
+- **B.** Model architecture (twin ESM-1b branches + concat classification head)
 - **C.** Training pipeline
-- **D.** Inference pipeline
+- **D.** Inference pipeline (multi-GPU)
 
 ## Citation
 
