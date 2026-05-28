@@ -1,12 +1,27 @@
+---
+license: mit
+library_name: pytorch
+tags:
+  - protein-protein-interaction
+  - ppi
+  - protein-language-model
+  - esm-architecture
+  - siamese
+  - trained-from-scratch
+  - bioinformatics
+  - biology
+pipeline_tag: feature-extraction
+---
+
 # ppiBTEP
 
-A Siamese (twin-branch) protein-protein interaction classifier built on ESM-1b ([Rives et al., 2021](https://doi.org/10.1073/pnas.2016239118)). Also designated SiameseBTPE (BERT-Twin Protein Encoder).
+A Siamese (twin-branch) protein-protein interaction classifier inspired by the ESM-1b transformer architecture ([Rives et al., 2021](https://doi.org/10.1073/pnas.2016239118)), but **substantially modified and trained from scratch** rather than fine-tuned from the released ESM-1b checkpoint. Also designated SiameseBTPE (BERT-Twin Protein Encoder).
 
 ![ppiBTEP Architecture](assets/ppiBTEP.png)
 
 ## Overview
 
-ppiBTEP processes each protein independently through a shared ESM-1b encoder -- no cross-sequence attention is used between the two proteins. Each branch extracts the `[CLS]` token embedding from the final transformer layer, the two embeddings are concatenated, and a dropout + linear classification head produces binary interaction predictions with softmax probabilities.
+ppiBTEP processes each protein independently through a shared ESM-1b-style transformer encoder -- no cross-sequence attention is used between the two proteins. Each branch extracts the `[CLS]` token embedding from the final transformer layer, the two embeddings are concatenated, and a dropout + linear classification head produces binary interaction predictions with softmax probabilities.
 
 Unlike the cross-encoding approach (see [ppiDCE](https://github.com/kouroshSA/ppiDCE)), ppiBTEP must capture interaction-predictive features entirely from each protein's own sequence context. This makes it faster per pair and allows protein representations to be precomputed and reused, at the cost of not modeling direct inter-protein residue dependencies.
 
@@ -16,7 +31,7 @@ The model was developed for the *Prochlorococcus marinus* MED4 interactome, wher
 
 | Parameter | Value |
 |-----------|-------|
-| Foundation | ESM-1b (facebook/esm1b_t33_650M_UR50S) |
+| Foundation | ESM-1b-inspired transformer (Rives et al., 2021) -- substantially modified, trained from scratch |
 | Strategy | Siamese / twin-branch |
 | Layers | 12 default; 6, 8, 12, 16, or 18 selectable via --num_layers |
 | Classification | Concat [CLS_A, CLS_B] -> Dropout(0.1) -> Linear -> 2 |
@@ -150,7 +165,7 @@ The input CSV should have two columns: PRS (positive) and RRS (random/negative) 
 
 The ASCII workflow diagram (`assets/ppiBTEP.png`) covers:
 - **A.** Siamese input strategy (independent per-protein encoding)
-- **B.** Model architecture (twin ESM-1b branches + concat classification head)
+- **B.** Model architecture (twin ESM-1b-style branches + concat classification head)
 - **C.** Training pipeline
 - **D.** Inference pipeline (multi-GPU)
 
