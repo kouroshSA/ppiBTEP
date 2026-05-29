@@ -122,14 +122,53 @@ python train_ppiBTPE3b.py \
 
 **Important:** When training from scratch, use `--freeze_layers 0` to ensure all layers (including embeddings) remain trainable. The default is 20, which would freeze most layers.
 
+### Quick start: fetch the checkpoint from Hugging Face
+
+The released MED4 checkpoint (`checkpoints/ppiBTPE_epoch_4.pth`, 12-layer)
+lives on this Hugging Face repo. Pull it without cloning the GitHub mirror:
+
+```python
+from huggingface_hub import hf_hub_download
+
+ckpt_path = hf_hub_download(
+    repo_id="kouroshSA/ppiBTEP",
+    filename="checkpoints/ppiBTPE_epoch_4.pth",
+)
+print(ckpt_path)   # pass this string to --model_path
+```
+
+`inference_ppiBTPE_2GPU.py` takes the checkpoint path as a direct
+`--model_path` argument, so no rename or specific directory layout is
+required — point it straight at the file you just downloaded. Use
+`--num_layers 12` to match the architecture this checkpoint was trained
+with.
+
+### Input file format
+
+The inference script expects a CSV with two columns of plain amino-acid
+sequences (one protein pair per row — no delimiter tokens, no length
+markers, no chevrons):
+
+```
+seq1,seq2
+MKLR...QSH,MSEDF...VKN
+MQAG...PIA,MTRRL...EEP
+```
+
+A ready-made example is shipped with the repo:
+[`MED4-PPIs-low-confidence_ppiTEPM_prompts.csv`](MED4-PPIs-low-confidence_ppiTEPM_prompts.csv).
+The labeled PRS/RRS reference sets (`MED4_PRS_100.csv`, `MED4_RRS_100.csv`)
+include a third label column, which the inference script ignores — only
+the first two columns are read.
+
 ### Inference
 
 ```bash
 python inference_ppiBTPE_2GPU.py \
-    --model_path out/ppiBTPE_epoch_17.pth \
+    --model_path checkpoints/ppiBTPE_epoch_4.pth \
     --model_config facebook/esm1b_t33_650M_UR50S \
     --num_layers 12 \
-    --input_file test_pairs.csv \
+    --input_file MED4-PPIs-low-confidence_ppiTEPM_prompts.csv \
     --output_file predictions.csv \
     --batch_size 4 \
     --max_length 1024 \
@@ -139,10 +178,10 @@ python inference_ppiBTPE_2GPU.py \
 Multi-GPU inference:
 ```bash
 python inference_ppiBTPE_2GPU.py \
-    --model_path out/ppiBTPE_final.pth \
+    --model_path checkpoints/ppiBTPE_epoch_4.pth \
     --model_config facebook/esm1b_t33_650M_UR50S \
     --num_layers 12 \
-    --input_file test_pairs.csv \
+    --input_file MED4-PPIs-low-confidence_ppiTEPM_prompts.csv \
     --output_file predictions.csv \
     --device cuda:0,1
 ```
