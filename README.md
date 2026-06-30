@@ -21,7 +21,7 @@ A Siamese (twin-branch) protein-protein interaction classifier inspired by the E
 
 ## Overview
 
-ppiBTEP processes each protein independently through a shared ESM-1b-style transformer encoder -- no cross-sequence attention is used between the two proteins. Each branch extracts the `[CLS]` token embedding from the final transformer layer, the two embeddings are concatenated, and a dropout + linear classification head produces binary interaction predictions with softmax probabilities.
+ppiBTEP processes each protein independently through a shared BERT/ESM-1 base (ESM-1b-architecture) transformer encoder -- no inter-protein attention is used between the two proteins. Each branch extracts the `[CLS]` token embedding from the final transformer layer, the two embeddings are concatenated, and a dropout + linear classification head produces binary interaction predictions with softmax probabilities.
 
 Unlike the cross-encoding approach (see [ppiDCE](https://github.com/kouroshSA/ppiDCE)), ppiBTEP must capture interaction-predictive features entirely from each protein's own sequence context. This makes it faster per pair and allows protein representations to be precomputed and reused, at the cost of not modeling direct inter-protein residue dependencies.
 
@@ -31,7 +31,7 @@ The model was developed for the *Prochlorococcus marinus* MED4 interactome, wher
 
 | Parameter | Value |
 |-----------|-------|
-| Foundation | ESM-1b-inspired transformer (Rives et al., 2021) -- substantially modified, trained from scratch |
+| Foundation | BERT/ESM-1 base — ESM-1b-architecture transformer (Rives et al., 2021), substantially modified, trained from scratch (not the released ESM-1b weights) |
 | Strategy | Siamese / twin-branch |
 | Layers | 12 default; 6, 8, 12, 16, or 18 selectable via --num_layers |
 | Classification | Concat [CLS_A, CLS_B] -> Dropout(0.1) -> Linear -> 2 |
@@ -44,7 +44,7 @@ The model was developed for the *Prochlorococcus marinus* MED4 interactome, wher
 | | ppiDCE (Cross-Encoder) | ppiBTEP (Siamese) |
 |---|---|---|
 | Input | `[CLS] Seq_A [SEP] Seq_B` (joint) | `[CLS] Seq_A` and `[CLS] Seq_B` (separate) |
-| Cross-attention | Full bidirectional at every layer | None |
+| Inter-protein attention | Yes — joint self-attention, every layer | None |
 | Classification | Single [CLS] -> Linear | Concat [CLS_A, CLS_B] -> Linear |
 | Complexity | O((n+m)^2) | O(n^2) + O(m^2) |
 | Speed | Slower (joint encoding) | Faster (independent, reusable) |
@@ -204,7 +204,7 @@ The input CSV should have two columns: PRS (positive) and RRS (random/negative) 
 
 The ASCII workflow diagram (`assets/ppiBTEP.png`) covers:
 - **A.** Siamese input strategy (independent per-protein encoding)
-- **B.** Model architecture (twin ESM-1b-style branches + concat classification head)
+- **B.** Model architecture (twin BERT/ESM-1 base branches + concat classification head)
 - **C.** Training pipeline
 - **D.** Inference pipeline (multi-GPU)
 
