@@ -8,10 +8,13 @@ Set) and RRS (Random Reference Set) sequence-pair files at each per-epoch
 checkpoint, computes ROC metrics, and derives integrated learning-efficiency
 scores.
 
-This is the ppiBTEP port of the [ppiGPLM LES-wrapper](https://github.com/kouroshSA/ppiGPLM)
-(see also the ppiDCE port). The evaluation logic (PRS/RRS → ROC →
-AUC/Best-F1/threshold → LES) is identical; only the model-specific glue differs
-(see [Differences from ppiDCE / ppiGPLM](#differences-from-ppidce--ppigplm)).
+This is the ppiBTEP port of the LES-wrapper family
+([ppiGPLM](https://github.com/kouroshSA/ppiGPLM),
+[ppiDCE](https://github.com/kouroshSA/ppiDCE),
+[ppiYYD](https://github.com/kouroshSA/ppiYYD)). The evaluation logic (PRS/RRS →
+`Probability_Friends` → ROC → AUC/Best-F1 → LES) is identical; only the
+model-specific glue differs. **Its outputs match ppiGPLM's `LES-wrapper_v2.py`**
+— see [Differences from the other wrappers](#differences-from-the-other-wrappers).
 
 ## What is LES?
 
@@ -21,11 +24,17 @@ learning trajectory:
 
 - **LES-AUC**: Area under the AUC trajectory curve
 - **LES-F1**: Area under the Best-F1 trajectory curve
-- **LES-Threshold**: Area under the optimal-threshold trajectory curve
 
 Epochs are normalized to `[0, 1]` before integration, so LES values are
 comparable across runs of different length. Higher LES indicates faster, more
 consistent learning across training.
+
+> **v2 change (adopted here):** the optimal-F1 **threshold** metric is *not*
+> reported. For non-discriminating controls the best-F1 threshold collapses
+> toward 0 ("predict everything positive"), so it added noise. Dropped
+> throughout: `trajectory_Threshold`, `LES-Threshold`, the `Best_F1_Threshold`
+> summary column, the manifest `Threshold` entry, and the threshold panel of the
+> combined figure.
 
 ## Workflow
 
@@ -34,11 +43,11 @@ For each checkpoint the wrapper:
 1. Runs `inference_ppiBTPE_2GPU.py` on the PRS and RRS files
 2. Extracts the positive-class probability (`Probability_Friends`) for every pair
 3. Combines PRS and RRS probabilities into a single file for ROC analysis
-4. Computes AUC, Best-F1, and the optimal threshold
-5. Generates a threshold-colored ROC curve plot
+4. Draws a per-checkpoint probability-distribution plot (PRS vs RRS violins)
+5. Computes AUC and Best-F1 and renders the ROC curve
 6. Aggregates per-checkpoint results into a summary table
-7. Plots metric trajectories across epochs
-8. Computes LES for each metric
+7. Plots metric trajectories and probability-distribution summaries across epochs
+8. Computes LES for AUC and Best-F1
 
 ## Installation
 
@@ -47,7 +56,7 @@ identical:
 
 ```bash
 conda activate esm
-pip install -r requirements.txt   # already includes scikit-learn, matplotlib, numpy
+pip install -r requirements.txt   # numpy, scikit-learn, matplotlib, pandas, torch, transformers
 ```
 
 ## Basic Usage
@@ -98,31 +107,20 @@ ppiBTEP's inference script supports DataParallel across GPUs:
 
 ```bash
 # Only epochs 5, 10, 15, 20
-python LES-wrapper.py \
-    --checkpoint_dir ROC_Checkpoints \
-    --prs_file MED4_PRS_100.csv \
-    --rrs_file MED4_RRS_100.csv \
-    --output_dir LES_results \
-    --num_layers 12 \
-    --checkpoint_pattern "ppiBTPE_epoch_[51]*0.pth"
+--checkpoint_pattern "ppiBTPE_epoch_[51]*0.pth"
 
 # Every epoch (default)
 --checkpoint_pattern "ppiBTPE_epoch_*.pth"
 ```
 
-### Skipping inference (re-computing metrics only)
+### Re-computing metrics without re-running inference
 
 ```bash
-python LES-wrapper.py \
-    --checkpoint_dir ROC_Checkpoints \
-    --prs_file MED4_PRS_100.csv \
-    --rrs_file MED4_RRS_100.csv \
-    --output_dir LES_results_MED4 \
-    --num_layers 12 \
-    --skip_inference
+python LES-wrapper.py ... --num_layers 12 --skip_inference
 ```
 
-Use `--no_plots` to skip trajectory figures when you only need the summary CSV.
+reuses the existing `*_probabilities.csv` files. Add `--no_plots` to skip the
+trajectory / distribution figures when you only need the summary CSV.
 
 ## Command-Line Arguments
 
@@ -141,53 +139,70 @@ Use `--no_plots` to skip trajectory figures when you only need the summary CSV.
 | `--max_length` | `1024` | Max token length per sequence |
 | `--device` | `cuda` | `cpu`, `cuda`, or multi-GPU `cuda:0,1` |
 | `--skip_inference` | False | Reuse existing probability CSVs |
-| `--no_plots` | False | Skip trajectory plots |
-| `--color_threshold` | False | Color the ROC curve by decision threshold and add a colorbar (default: plain single-color curve, no scale) |
+| `--no_plots` | False | Skip trajectory / distribution plots |
+| `--color_threshold` | False | Color the ROC curve by decision threshold and add a colorbar |
 
 ## Figures
 
 All PNGs are written at **publication quality** (600 dpi, tight bounding box,
-enlarged fonts, heavier axis lines). Individual ROC plots annotate **AUC and
-Best F1 only** — the optimal threshold is still computed and recorded in
-`summary_table.csv` / `manifest.json`, but is not shown on the curve. By default
-the ROC curve is a single color with no threshold colorbar; pass
-`--color_threshold` to render the threshold-colored curve with its scale.
+enlarged fonts, heavier axis lines), and every PNG now has a companion vector
+**`.pdf`** at the same path. Individual ROC plots annotate **AUC and Best F1**;
+by default the ROC curve is a single color with no threshold colorbar — pass
+`--color_threshold` to render the threshold-colored curve.
+
+The probability-distribution figures show `Probability_Friends` for PRS (blue,
+positives) vs RRS (red, negatives) as violins + jittered points, y-axis fixed to
+`[0, 1]`. A discriminating model keeps PRS high and RRS low.
 
 ## Output Structure
 
 ```
 LES_results_MED4/
 ├── epoch_1/
-│   ├── PRS_epoch1_probabilities.csv      # full inference_ppiBTPE_2GPU.py output
+│   ├── PRS_epoch1_probabilities.csv        # full inference_ppiBTPE_2GPU.py output
 │   ├── RRS_epoch1_probabilities.csv
-│   ├── combined_probabilities_epoch1.csv # PRS,RRS positive-prob columns for ROC
-│   └── ROC_epoch1.png
+│   ├── combined_probabilities_epoch1.csv   # PRS,RRS positive-prob columns for ROC
+│   ├── prob_dist_epoch1.png / .pdf         # PRS-vs-RRS distribution
+│   └── ROC_epoch1.png / .pdf
 ├── epoch_2/ ...
-├── epoch_final/ ...                       # only with --include_final
-├── trajectory_AUC.png
-├── trajectory_F1.png
-├── trajectory_Threshold.png
-├── trajectory_combined.png
+├── epoch_final/ ...                        # only with --include_final
+├── trajectory_AUC.png / .pdf
+├── trajectory_F1.png / .pdf
+├── trajectory_combined.png / .pdf          # 1x2 AUC + Best-F1 (no threshold panel)
+├── summary_prob_distributions.png / .pdf           # one panel per checkpoint
+├── summary_prob_distributions_combined.png / .pdf  # all PRS then all RRS, one axes
 ├── summary_table.csv
-└── manifest.json
+├── manifest.json
+└── README.md                               # legend for the analysis-level plots
 ```
 
-`summary_table.csv` contains one row per checkpoint plus a final row with the
-integrated LES values. `manifest.json` records full run metadata (timestamp,
-inputs, model config, num_layers, per-checkpoint results, and LES scores).
+`summary_table.csv` has columns `checkpoint, epoch, AUC, Best_F1, PRS_samples,
+RRS_samples` plus a final LES row. `manifest.json` records full run metadata
+(timestamp, inputs, model config, num_layers, per-checkpoint results, and LES
+scores).
 
-## Differences from ppiDCE / ppiGPLM
+> **Single-checkpoint runs.** With only one matching checkpoint the wrapper does
+> the per-checkpoint analysis (probabilities, ROC, distribution plot) but skips
+> LES, the trajectory plots, and the distribution summaries — these need ≥ 2
+> checkpoints.
 
-| Aspect | ppiGPLM | ppiDCE | ppiBTEP (this wrapper) |
-|--------|---------|--------|------------------------|
+## Differences from the other wrappers
+
+| Aspect | ppiGPLM `v2` | ppiDCE | ppiBTEP (this wrapper) |
+|--------|--------------|--------|------------------------|
 | Checkpoints | `ckpt_*.pt` (iterations) | `ppiDCE_epoch*.pth` | `ppiBTPE_epoch_*.pth` (underscore) + `ppiBTPE_final.pth` |
-| Trajectory x-axis | iteration | epoch | epoch |
-| Inference engine | `sample_fasta...hope_v3.py` | `inference_ppiDCE.py` | `inference_ppiBTPE_2GPU.py` (**requires `--num_layers`**; supports `cuda:0,1`) |
-| Inference output | `Prompt, Probability_of_1, Probability_of_0` → `[-2]` | `seq1, seq2, [label,] pred_label, prob_0, prob_1` → `prob_1` (last col) | `seq1, seq2, [label,] Prediction, Probability_Friends, Probability_Enemies` → `Probability_Friends` (**second-to-last** col) |
+| Trajectory x-axis | iteration | epoch | **epoch** |
+| Inference engine | `sample_fasta…3f.py` | `inference_ppiDCE.py` | `inference_ppiBTPE_2GPU.py` (**requires `--num_layers`**; supports `cuda:0,1`) |
+| Positive-class prob | `Probability_of_1` → `[-2]` | `prob_1` (last col) | `Probability_Friends` (**2nd-to-last**; `Probability_Enemies` last) |
+| Output shape | v2 (no threshold, PDFs, prob-dist plots, README) | v2 | **v2** (matches ppiGPLM) |
 
-The concrete adjustment for ppiBTEP: the positive-class probability is read from
-the column named `Probability_Friends` (the interacting class), falling back to
-the **second-to-last** column if the header is absent — because
-`Probability_Enemies` (the negative class) is the final column here, the opposite
-ordering to ppiDCE's `prob_1`-last layout. The wrapper also threads the required
-`--num_layers` through to the inference script.
+Two model-specific notes for ppiBTEP:
+
+- **Score meaning.** `Probability_Friends` is a genuine 2-class softmax over
+  `{enemies, friends}`, so `Probability_Friends + Probability_Enemies = 1` exactly
+  — unlike ppiGPLM's whole-vocabulary language-model softmax where `P(1)` and
+  `P(0)` need not sum to 1. The `README.md` written into each output dir explains
+  this.
+- **Layer count is load-critical.** The wrapper threads the required `--num_layers`
+  through to the inference script, which rebuilds the SiameseBTPE config with that
+  many transformer layers before loading the checkpoint.
