@@ -36,8 +36,8 @@ This is the ppiBTEP port of the LES-wrapper family. Two things about it:
 Basic usage:
     python LES-wrapper.py \\
         --checkpoint_dir ROC_Checkpoints \\
-        --prs_file MED4_PRS_100.csv \\
-        --rrs_file MED4_RRS_100.csv \\
+        --prs_file MED4_PRS-RRS/PRS-V3-1.csv \\
+        --rrs_file MED4_PRS-RRS/RRS-V3-1.csv \\
         --output_dir LES_results_MED4 \\
         --num_layers 12 \\
         --include_final
@@ -92,7 +92,7 @@ def parse_args():
         epilog="""
 Examples:
   python LES-wrapper.py --checkpoint_dir ROC_Checkpoints \\
-      --prs_file MED4_PRS_100.csv --rrs_file MED4_RRS_100.csv \\
+      --prs_file MED4_PRS-RRS/PRS-V3-1.csv --rrs_file MED4_PRS-RRS/RRS-V3-1.csv \\
       --output_dir LES_results --num_layers 12 --include_final
         """
     )

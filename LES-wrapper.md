@@ -64,8 +64,8 @@ pip install -r requirements.txt   # numpy, scikit-learn, matplotlib, pandas, tor
 ```bash
 python LES-wrapper.py \
     --checkpoint_dir ROC_Checkpoints \
-    --prs_file MED4_PRS_100.csv \
-    --rrs_file MED4_RRS_100.csv \
+    --prs_file MED4_PRS-RRS/PRS-V3-1.csv \
+    --rrs_file MED4_PRS-RRS/RRS-V3-1.csv \
     --output_dir LES_results_MED4 \
     --num_layers 12 \
     --include_final
@@ -90,7 +90,7 @@ negative (0).
 > **Header note:** `inference_ppiBTPE_2GPU.py` reads input with pandas' default
 > behavior, which treats the **first row as a header**. Give each PRS/RRS file a
 > `seq1,seq2` header row; otherwise the first sequence pair is silently consumed
-> as the header and dropped. The shipped `MED4_PRS_100.csv` / `MED4_RRS_100.csv`
+> as the header and dropped. The shipped `MED4_PRS-RRS/PRS-V3-1.csv` / `MED4_PRS-RRS/RRS-V3-1.csv`
 > are headerless — add a header line if you need all 100 pairs scored.
 
 ## Common Patterns
