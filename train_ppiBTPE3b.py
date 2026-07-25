@@ -42,8 +42,17 @@ Example
         --max_length 1024 \\
         --output_dir ./out \\
         --device cuda
+
+Learning-rate schedule
+----------------------
+Default is a constant --learning_rate. Pass --lr_schedule warmup_cosine to use
+the same per-iteration warmup+cosine schedule as ppiYYD (linear warmup 0->peak,
+then cosine decay peak->--min_lr), for side-by-side comparable training:
+
+    --lr_schedule warmup_cosine --learning_rate 2e-5 --min_lr 2e-6 --warmup_ratio 0.1
 """
 import argparse
+import math
 import os
 import torch
 import torch.nn as nn
@@ -79,7 +88,22 @@ parser.add_argument('--freeze_layers', type=int, default=20,
 # Training hyperparameters
 parser.add_argument('--epochs', type=int, default=3, help='Number of training epochs.')
 parser.add_argument('--batch_size', type=int, default=4, help='Batch size.')
-parser.add_argument('--learning_rate', type=float, default=1e-5, help='Learning rate.')
+parser.add_argument('--learning_rate', type=float, default=1e-5,
+                    help='Learning rate. With --lr_schedule warmup_cosine this is the PEAK '
+                         'reached at the end of warmup.')
+parser.add_argument('--lr_schedule', type=str, default='constant',
+                    choices=['constant', 'warmup_cosine'],
+                    help="LR schedule. 'constant' (default) holds --learning_rate. "
+                         "'warmup_cosine' ramps 0->peak over the warmup, then cosine-decays "
+                         "peak->--min_lr over the rest (per-iteration, mirrors ppiYYD).")
+parser.add_argument('--warmup_ratio', type=float, default=0.1,
+                    help='warmup_cosine: warmup length as a fraction of total steps '
+                         '(default 0.1); ignored if --warmup_steps is given.')
+parser.add_argument('--warmup_steps', type=int, default=None,
+                    help='warmup_cosine: explicit warmup length in iterations '
+                         '(overrides --warmup_ratio).')
+parser.add_argument('--min_lr', type=float, default=0.0,
+                    help='warmup_cosine: floor the cosine decays to (e.g. 2e-6). Default 0.')
 parser.add_argument('--max_length', type=int, default=1024,
                     help='Maximum sequence length for tokenization.')
 
@@ -184,8 +208,31 @@ def main():
     crit  = nn.CrossEntropyLoss()
     os.makedirs(args.output_dir, exist_ok=True)
 
+    # per-iteration LR schedule (mirrors nanoGPT's get_lr(it) / ppiYYD): linear
+    # warmup 0->peak, then cosine decay peak->min_lr. Stepped once per optimizer step.
+    scheduler = None
+    if args.lr_schedule == 'warmup_cosine':
+        total_steps = args.epochs * len(train_loader)
+        warmup = (args.warmup_steps if args.warmup_steps is not None
+                  else int(round(args.warmup_ratio * total_steps)))
+        peak, floor = args.learning_rate, args.min_lr
+
+        def lr_lambda(step):                       # returns lr(step)/peak
+            if step < warmup:
+                return (step + 1) / (warmup + 1)
+            dr = (step - warmup) / max(1, total_steps - warmup)
+            dr = min(1.0, dr)
+            coeff = 0.5 * (1.0 + math.cos(math.pi * dr))    # 1 -> 0
+            return (floor + coeff * (peak - floor)) / peak
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda)
+        print(f"LR schedule: warmup_cosine | peak={peak:g} min={floor:g} "
+              f"warmup={warmup} steps ({warmup/len(train_loader):.2f} epoch) "
+              f"total={total_steps} steps (per-iteration)")
+
     for e in range(args.epochs):
-        print(f"Epoch {e+1}/{args.epochs}")
+        cur_lr = optim.param_groups[0]['lr']
+        print(f"Epoch {e+1}/{args.epochs}  (lr={cur_lr:.3e})")
         model.train()
         train_loss=0
         for b in tqdm(train_loader, desc='Train'):
@@ -194,6 +241,8 @@ def main():
                            b['input_ids2'].to(device), b['attention_mask2'].to(device))
             loss = crit(logits, b['labels'].to(device))
             loss.backward(); optim.step()
+            if scheduler is not None:
+                scheduler.step()               # per-iteration LR update
             train_loss+=loss.item()
         print(f"Train loss: {train_loss/len(train_loader):.4f}")
 
