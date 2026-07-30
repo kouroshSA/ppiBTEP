@@ -129,12 +129,11 @@ Examples:
                              'the checkpoint was trained with if different.')
     parser.add_argument('--batch_size', type=int, default=4,
                         help='Inference batch size (default: 4)')
-    parser.add_argument('--max_length', type=int, default=512,
-                        help='Max token length per sequence. Default 512 to MATCH the '
-                             'ppiBTEP V3 training (they were trained at max_length 512); '
-                             'evaluating at a longer length feeds the from-scratch model '
-                             'position embeddings it never trained on. Pass the value the '
-                             'checkpoint was trained with.')
+    parser.add_argument('--max_length', type=int, default=1024,
+                        help='Max token length per sequence. Default 1024 to match the '
+                             'ppiBTEP V3 training. Use the value the checkpoint was trained '
+                             'with — a from-scratch model only trained position embeddings '
+                             'up to its training length.')
     parser.add_argument('--device', type=str, default='cuda',
                         help='Device: cpu, cuda, or multi-GPU e.g. cuda:0,1 (default: cuda)')
 

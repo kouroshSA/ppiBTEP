@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # LES for ppiBTEP V3-1 and V3-2 across five reference-set conditions, reusing the
 # ppiDCE reference / control sets (identical 2-column format). ppiBTEP V3 config:
-# num_layers 6, max_length 512, esm1b; all 10 epoch checkpoints + final. The three
+# num_layers 6, max_length 1024, esm1b; all 10 epoch checkpoints + final. The three
 # random-control conditions auto-skip AUC/F1 (no true positives). Resumable.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,7 +21,7 @@ les () {  # $1=label $2=prs $3=rrs $4=ckptdir $5=outdir
   for f in "$2" "$3"; do [ -f "$f" ] || { echo "  MISSING $f -- skip $1"; return; }; done
   echo "######## V3-$k  $1  $(date '+%F %T') ########"
   "$PY" "$ROOT/LES-wrapper.py" \
-      --checkpoint_dir "$4" --num_layers 6 --max_length 512 --include_final \
+      --checkpoint_dir "$4" --num_layers 6 --max_length 1024 --include_final \
       --model_config facebook/esm1b_t33_650M_UR50S \
       --prs_file "$2" --rrs_file "$3" --output_dir "$5"
   echo "=== V3-$k $1 summary ==="; cat "$5/summary_table.csv"

@@ -5,16 +5,16 @@ produce the Learning-Efficiency-Score (LES) analysis.
 
 ## Match the training config (required)
 
-The V3 checkpoints are **6-layer** and were trained at **max_length 512**. Every
+The V3 checkpoints are **6-layer** and were trained at **max_length 1024**. Every
 inference / LES run must use the same, or it breaks:
 
 - `--num_layers 6` — the inference script rebuilds the Siamese config with this
   many layers; a mismatch (e.g. the old default 12) raises a contact-head size
   error and cannot load the checkpoint.
-- `--max_length 512` — a from-scratch model only trained position embeddings up to
+- `--max_length 1024` — a from-scratch model only trained position embeddings up to
   its training length; evaluating longer feeds it untrained positions.
 
-`LES-wrapper.py` now **defaults to `--num_layers 6 --max_length 512`**, so the
+`LES-wrapper.py` now **defaults to `--num_layers 6 --max_length 1024`**, so the
 plain command is correct for V3; pass explicit values only for other models.
 
 ## Run LES on a checkpoint directory
@@ -26,7 +26,7 @@ $PY LES-wrapper.py \
     --prs_file V3_PRS-RRS/PRS-RRS/PRS-V3-1.csv \
     --rrs_file V3_PRS-RRS/PRS-RRS/RRS-V3-1.csv \
     --output_dir LES_Results_V3/V3-1/LES_regular \
-    --num_layers 6 --max_length 512 --include_final
+    --num_layers 6 --max_length 1024 --include_final
 ```
 
 Per checkpoint it writes `epoch_<N>/` with the probability CSVs, a PRS-vs-RRS

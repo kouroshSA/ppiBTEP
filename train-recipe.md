@@ -11,17 +11,17 @@ ESM-1b-architecture PPI classifier trained **from scratch** (shared encoder,
 | Encoder | ESM-1b architecture, **from scratch** (not pretrained weights) |
 | Layers | `--num_layers 6` (6 transformer layers; **not** the full 33) |
 | Freeze | `--freeze_layers 0` (train everything) |
-| Max length | `--max_length 512` |
+| Max length | `--max_length 1024` |
 | LR schedule | `--lr_schedule warmup_cosine` — peak `--learning_rate 2e-5`, floor `--min_lr 2e-6`, `--warmup_ratio 0.1` |
 | Epochs / batch | `--epochs 10`, `--batch_size 4` |
 | Seed | `--seed 42` |
 | Model config | `--model_config facebook/esm1b_t33_650M_UR50S` (tokenizer/config only; weights random) |
 
 > **Two values that matter downstream:** the checkpoints are **6-layer** and were
-> trained at **max_length 512**. Any inference / LES run must use the same
-> (`--num_layers 6 --max_length 512`) or loading fails (layer-count mismatch) /
+> trained at **max_length 1024**. Any inference / LES run must use the same
+> (`--num_layers 6 --max_length 1024`) or loading fails (layer-count mismatch) /
 > results drift (position embeddings the from-scratch model never trained on). The
-> LES-wrapper now defaults to both.
+> LES-wrapper defaults to both.
 
 ## Command (per replicate k)
 
@@ -30,7 +30,7 @@ PY=/home/ksa/anaconda3/envs/esm/bin/python
 $PY train_ppiBTPE3b.py \
     --train_file <depleted_training_set-V3-k.csv> --val_file <val.csv> \
     --num_layers 6 --freeze_layers 0 \
-    --epochs 10 --batch_size 4 --max_length 512 \
+    --epochs 10 --batch_size 4 --max_length 1024 \
     --lr_schedule warmup_cosine --learning_rate 2e-5 --min_lr 2e-6 --warmup_ratio 0.1 \
     --seed 42 --output_dir results_V3-k/model
 ```
