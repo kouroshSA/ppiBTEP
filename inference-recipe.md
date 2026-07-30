@@ -46,9 +46,12 @@ trajectories, the `summary_prob_distributions*` violins, `summary_table.csv`
 | homodimers-only | `PRS-RRS_homodimers_only/{PRS,RRS}-V3-k.csv` |
 | ps1 / ps2 / ps1-ps2 random | `random_controls/{PRS,RRS}-V3-k_{ps1,ps2,ps1-ps2}_random.csv` |
 
-`run_les_all_conditions.sh` runs all five for V3-1 and V3-2;
+`run_les_all_conditions.sh` runs all six conditions for the given replicates
+(using the in-repo `V3_PRS-RRS/` sets; override with `REF=...`), or use
+`eval_per_epoch.sh` to score each epoch as it lands (see `campaign.md` §2b).
 `run_composites_all_conditions.sh` then builds the cross-replicate composites
-(`make_composite_les.py` trajectories + violins, `composite_roc_btep.py` ROC).
+(`make_composite_les.py` trajectories + violins, `composite_roc_btep.py` ROC for
+the real-positive conditions).
 
 ## Random controls: AUC-ROC and Best-F1 are excluded
 

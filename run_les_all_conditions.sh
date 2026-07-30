@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# LES for ppiBTEP V3-1 and V3-2 across five reference-set conditions, reusing the
-# ppiDCE reference / control sets (identical 2-column format). ppiBTEP V3 config:
+# LES for ppiBTEP V3 replicates across the six reference-set conditions, using the
+# in-repo V3_PRS-RRS/ reference & control sets (2-column format). ppiBTEP V3 config:
 # num_layers 6, max_length 1024, esm1b; all 10 epoch checkpoints + final. The three
 # random-control conditions auto-skip AUC/F1 (no true positives). Resumable.
+# Override the reference root with REF=/path/to/V3_PRS-RRS if needed.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PY="${PY:-/home/ksa/anaconda3/envs/esm/bin/python}"
 export HF_HUB_OFFLINE=1 MPLBACKEND=Agg PYTHONUNBUFFERED=1
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0}"
 
-REFROOT=/home/ksa/Models/ppiDCE
-REG="$REFROOT/MED4_PRS-RRS"
-NH="$REFROOT/MED4_PRS-RRS_no_homodimers"
-RC="$REFROOT/PRS-RRS_random_controls"
+REF="${REF:-$ROOT/V3_PRS-RRS}"
+REG="$REF/PRS-RRS"
+NH="$REF/PRS-RRS_no_homodimers"
+HO="$REF/PRS-RRS_homodimers_only"
+RC="$REF/random_controls"
 OUTROOT="$ROOT/LES_Results_V3"
 MODELS=("$@"); [ ${#MODELS[@]} -eq 0 ] && MODELS=(1 2)
 
@@ -31,9 +33,10 @@ for k in "${MODELS[@]}"; do
   CK="$ROOT/results_V3-${k}/model"
   [ -f "$CK/ppiBTPE_final.pth" ] || { echo "MISSING checkpoints for V3-$k -- skip"; continue; }
   O="$OUTROOT/V3-$k"
-  les regular        "$REG/PRS-V3-$k.csv"                "$REG/RRS-V3-$k.csv"                "$CK" "$O/LES_regular"
-  les no_homodimers  "$NH/PRS-V3-$k.csv"                 "$NH/RRS-V3-$k.csv"                 "$CK" "$O/LES_no_homodimers"
-  les ps1_random     "$RC/PRS-V3-${k}_ps1_random.csv"     "$RC/RRS-V3-${k}_ps1_random.csv"     "$CK" "$O/LES_ps1_random"
+  les regular         "$REG/PRS-V3-$k.csv"                "$REG/RRS-V3-$k.csv"                "$CK" "$O/LES_regular"
+  les no_homodimers   "$NH/PRS-V3-$k.csv"                 "$NH/RRS-V3-$k.csv"                 "$CK" "$O/LES_no_homodimers"
+  les homodimers_only "$HO/PRS-V3-$k.csv"                 "$HO/RRS-V3-$k.csv"                 "$CK" "$O/LES_homodimers_only"
+  les ps1_random      "$RC/PRS-V3-${k}_ps1_random.csv"     "$RC/RRS-V3-${k}_ps1_random.csv"     "$CK" "$O/LES_ps1_random"
   les ps2_random     "$RC/PRS-V3-${k}_ps2_random.csv"     "$RC/RRS-V3-${k}_ps2_random.csv"     "$CK" "$O/LES_ps2_random"
   les ps1-ps2_random "$RC/PRS-V3-${k}_ps1-ps2_random.csv" "$RC/RRS-V3-${k}_ps1-ps2_random.csv" "$CK" "$O/LES_ps1-ps2_random"
 done

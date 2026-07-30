@@ -112,6 +112,10 @@ parser.add_argument('--output_dir', type=str, default='./',
                     help='Directory to save checkpoints and final model.')
 parser.add_argument('--device', type=str, default='cuda', choices=['cpu','cuda'],
                     help='Device to run training on.')
+parser.add_argument('--seed', type=int, default=None,
+                    help='Random seed for reproducibility (Python/torch/CUDA, incl. the '
+                         'DataLoader shuffle). Default None = unseeded. The V3 recipe uses '
+                         '--seed 42.')
 args = parser.parse_args()
 
 # Device setup
@@ -172,6 +176,14 @@ class SiameseBTPE(nn.Module):
 # Main training loop
 
 def main():
+    if args.seed is not None:
+        import random as _random
+        _random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(args.seed)
+        print(f"Seed set to {args.seed} (Python/torch/CUDA; DataLoader shuffle deterministic)")
+
     tokenizer = EsmTokenizer.from_pretrained(args.model_config)
     config = EsmConfig.from_pretrained(args.model_config)
     if args.num_layers is not None:

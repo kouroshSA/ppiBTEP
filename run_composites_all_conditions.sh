@@ -18,12 +18,16 @@ comp () {  # $1=cond
   local out="$OUTROOT/$cond"; mkdir -p "$out"
   "$PY" "$ROOT/make_composite_les.py" --parent "$stage" --run_glob 'LES_V3-*' \
       --out "$out" --pos_col Probability_Friends
-  "$PY" "$ROOT/composite_roc_btep.py" --parent "$stage" --models "$N" \
-      --model-name ppiBTEP --out "$out/ROC"
+  # Composite ROC only for real-positive sets; random controls have no positives.
+  case "$cond" in
+    *random) echo "  ($cond: random control -> skipping composite ROC)";;
+    *) "$PY" "$ROOT/composite_roc_btep.py" --parent "$stage" --models "$N" \
+           --model-name ppiBTEP --out "$out/ROC";;
+  esac
 }
 
 echo "Composite across ${N} models: V3-${MODELS[*]}"
-for cond in regular no_homodimers ps1_random ps2_random ps1-ps2_random; do
+for cond in regular no_homodimers homodimers_only ps1_random ps2_random ps1-ps2_random; do
   echo "===== $cond ====="; comp "$cond"
 done
 rm -rf "$STAGEROOT"
